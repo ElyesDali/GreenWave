@@ -30,17 +30,23 @@ workflows:
           # 1. Compilation
           flutter build ios --release --no-codesign
           
-          # 2. On s'assure d'être à la racine du projet
+          # 2. Retour à la racine pour éviter de se perdre
           cd $CM_BUILD_DIR
           rm -rf Payload GreenWave.ipa
           mkdir Payload
           
-          # 3. On trouve le Runner.app (peu importe où Flutter l'a mis) et on le copie
-          APP_PATH=$(find build -name "Runner.app" -type d | head -n 1)
-          cp -Rp "$APP_PATH" Payload/
+          # 3. Copie forcée du VRAI dossier compilé (le -L force la copie des fichiers lourds, pas des raccourcis)
+          if [ -d "build/ios/iphoneos/Runner.app" ]; then
+            cp -RL build/ios/iphoneos/Runner.app Payload/
+          elif [ -d "build/ios/Release-iphoneos/Runner.app" ]; then
+            cp -RL build/ios/Release-iphoneos/Runner.app Payload/
+          else
+            echo "Erreur: Le vrai Runner.app est introuvable."
+            exit 1
+          fi
           
-          # 4. Création du fichier .ipa final
-          zip -ry GreenWave.ipa Payload
+          # 4. Zippage propre pour AltStore (on exclut les fichiers cachés Mac qui font planter l'install)
+          zip -qry GreenWave.ipa Payload -x "*.DS_Store" -x "__MACOSX/*"
           
     artifacts:
       - GreenWave.ipa
