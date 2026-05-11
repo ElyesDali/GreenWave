@@ -3,8 +3,8 @@ workflows:
     name: GreenWave iOS Build
     instance_type: mac_mini_m2
     environment:
-      groups:           # <-- Ajout de cette ligne
-        - mapbox        # <-- Ajout du nom du groupe créé
+      groups:
+        - mapbox
       flutter: default
       xcode: latest
       cocoapods: default
@@ -15,6 +15,12 @@ workflows:
           chmod 0600 ~/.netrc
       - name: Get Flutter packages
         script: flutter pub get
+      - name: Generate Podfile and Fix iOS Version
+        script: |
+          # 1. Demande au Mac de Codemagic de générer le Podfile manquant
+          flutter build ios --config-only
+          # 2. Force la version 14.0 dans le fichier généré
+          sed -i '' "s/^# platform :ios.*/platform :ios, '14.0'/g" ios/Podfile
       - name: Install iOS Pods
         script: |
           cd ios
