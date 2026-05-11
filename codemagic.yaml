@@ -27,26 +27,25 @@ workflows:
           pod install
       - name: Build iOS app & Create IPA for AltStore
         script: |
-          # 1. Compilation
+          # 1. Nettoyage radical des anciens builds parasites
+          rm -rf build/ios
+          
+          # 2. Compilation
           flutter build ios --release --no-codesign
           
-          # 2. Retour à la racine pour éviter de se perdre
+          # 3. Affichage du poids de l'application (pour le diagnostic)
+          echo "=== TAILLE DU DOSSIER GENERE ==="
+          du -sh build/ios/iphoneos/Runner.app || echo "Dossier introuvable"
+          
+          # 4. Création de l'archive AltStore
           cd $CM_BUILD_DIR
           rm -rf Payload GreenWave.ipa
           mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qr GreenWave.ipa Payload
           
-          # 3. Copie forcée du VRAI dossier compilé (le -L force la copie des fichiers lourds, pas des raccourcis)
-          if [ -d "build/ios/iphoneos/Runner.app" ]; then
-            cp -RL build/ios/iphoneos/Runner.app Payload/
-          elif [ -d "build/ios/Release-iphoneos/Runner.app" ]; then
-            cp -RL build/ios/Release-iphoneos/Runner.app Payload/
-          else
-            echo "Erreur: Le vrai Runner.app est introuvable."
-            exit 1
-          fi
-          
-          # 4. Zippage propre pour AltStore (on exclut les fichiers cachés Mac qui font planter l'install)
-          zip -qry GreenWave.ipa Payload -x "*.DS_Store" -x "__MACOSX/*"
-          
+          # 5. Affichage du poids de l'IPA final
+          echo "=== TAILLE DE L'ARCHIVE FINALE ==="
+          ls -lh GreenWave.ipa
     artifacts:
       - GreenWave.ipa
