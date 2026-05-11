@@ -1,0 +1,25 @@
+workflows:
+  ios-workflow:
+    name: GreenWave iOS Build
+    instance_type: mac_mini_m2
+    environment:
+      groups:           # <-- Ajout de cette ligne
+        - mapbox        # <-- Ajout du nom du groupe créé
+      flutter: default
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Configuration du token Mapbox (iOS)
+        script: |
+          echo "machine api.mapbox.com login mapbox password $MAPBOX_DOWNLOADS_TOKEN" > ~/.netrc
+          chmod 0600 ~/.netrc
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Install iOS Pods
+        script: |
+          cd ios
+          pod install
+      - name: Build iOS app (Unsigned for testing)
+        script: flutter build ios --release --no-codesign
+    artifacts:
+      - build/ios/iphoneos/Runner.app
