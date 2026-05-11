@@ -30,9 +30,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _requestPermissions() async {
-    final status = await Permission.locationWhenInUse.request();
+    // 1. On vérifie si le GPS physique est allumé
+    bool serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) setState(() => _permissionsGranted = false);
+      return;
+    }
+
+    // 2. On vérifie l'état de la permission
+    geo.LocationPermission permission = await geo.Geolocator.checkPermission();
+    
+    // 3. Si c'est refusé ou non demandé, on lance la popup iOS
+    if (permission == geo.LocationPermission.denied) {
+      permission = await geo.Geolocator.requestPermission();
+    }
+
+    // 4. On valide si on a "Lorsque l'app est active" OU "Toujours"
     if (mounted) {
-      setState(() => _permissionsGranted = status.isGranted);
+      setState(() {
+        _permissionsGranted = (permission == geo.LocationPermission.whileInUse || 
+                               permission == geo.LocationPermission.always);
+      });
     }
   }
 
