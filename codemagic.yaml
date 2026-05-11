@@ -13,39 +13,108 @@ workflows:
         script: |
           echo "machine api.mapbox.com login mapbox password $MAPBOX_DOWNLOADS_TOKEN" > ~/.netrc
           chmod 0600 ~/.netrc
+          
       - name: Get Flutter packages
         script: flutter pub get
+        
       - name: Generate Podfile and Fix iOS Version
         script: |
-          # 1. Demande au Mac de Codemagic de générer le Podfile manquant
           flutter build ios --config-only
-          # 2. Force la version 14.0 dans le fichier généré
           sed -i '' "s/^# platform :ios.*/platform :ios, '14.0'/g" ios/Podfile
+          
       - name: Install iOS Pods
         script: |
           cd ios
           pod install
+          
+      - name: REPARATION AUTOMATIQUE (Bypass Windows Encoding)
+        script: |
+          cat << 'EOF' > ios/Runner/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleDevelopmentRegion</key>
+            <string>$(DEVELOPMENT_LANGUAGE)</string>
+            <key>CFBundleDisplayName</key>
+            <string>GreenWave</string>
+            <key>CFBundleExecutable</key>
+            <string>$(EXECUTABLE_NAME)</string>
+            <key>CFBundleIdentifier</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+            <key>CFBundleName</key>
+            <string>greenwave_gps</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>$(FLUTTER_BUILD_NAME)</string>
+            <key>CFBundleSignature</key>
+            <string>????</string>
+            <key>CFBundleVersion</key>
+            <string>$(FLUTTER_BUILD_NUMBER)</string>
+            <key>LSRequiresIPhoneOS</key>
+            <true/>
+            <key>UILaunchStoryboardName</key>
+            <string>LaunchScreen</string>
+            <key>UIMainStoryboardFile</key>
+            <string>Main</string>
+            <key>UISupportedInterfaceOrientations</key>
+            <array>
+              <string>UIInterfaceOrientationPortrait</string>
+              <string>UIInterfaceOrientationLandscapeLeft</string>
+              <string>UIInterfaceOrientationLandscapeRight</string>
+            </array>
+            <key>UISupportedInterfaceOrientations~ipad</key>
+            <array>
+              <string>UIInterfaceOrientationPortrait</string>
+              <string>UIInterfaceOrientationPortraitUpsideDown</string>
+              <string>UIInterfaceOrientationLandscapeLeft</string>
+              <string>UIInterfaceOrientationLandscapeRight</string>
+            </array>
+            <key>UIViewControllerBasedStatusBarAppearance</key>
+            <false/>
+            <key>CADisableMinimumFrameDurationOnPhone</key>
+            <true/>
+            <key>UIApplicationSupportsIndirectInputEvents</key>
+            <true/>
+            <key>NSLocationWhenInUseUsageDescription</key>
+            <string>GreenWave a besoin de votre position pour le guidage.</string>
+            <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+            <string>GreenWave utilise votre position en arriere-plan.</string>
+            <key>NSLocationAlwaysUsageDescription</key>
+            <string>Le GPS est necessaire en permanence.</string>
+            <key>UIBackgroundModes</key>
+            <array>
+              <string>location</string>
+              <string>audio</string>
+              <string>fetch</string>
+              <string>remote-notification</string>
+            </array>
+          </dict>
+          </plist>
+          EOF
+          
       - name: Build iOS app & Create IPA for AltStore
         script: |
-          # 1. Nettoyage radical des anciens builds parasites
+          # Compilation propre
           rm -rf build/ios
-          
-          # 2. Compilation
           flutter build ios --release --no-codesign
           
-          # 3. Affichage du poids de l'application (pour le diagnostic)
-          echo "=== TAILLE DU DOSSIER GENERE ==="
-          du -sh build/ios/iphoneos/Runner.app || echo "Dossier introuvable"
-          
-          # 4. Création de l'archive AltStore
+          # Packager l'IPA
           cd $CM_BUILD_DIR
           rm -rf Payload GreenWave.ipa
           mkdir Payload
-          cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -qr GreenWave.ipa Payload
           
-          # 5. Affichage du poids de l'IPA final
-          echo "=== TAILLE DE L'ARCHIVE FINALE ==="
-          ls -lh GreenWave.ipa
+          if [ -d "build/ios/iphoneos/Runner.app" ]; then
+            cp -RL build/ios/iphoneos/Runner.app Payload/
+          elif [ -d "build/ios/Release-iphoneos/Runner.app" ]; then
+            cp -RL build/ios/Release-iphoneos/Runner.app Payload/
+          fi
+          
+          # Zippage clean
+          zip -qry GreenWave.ipa Payload -x "*.DS_Store" -x "__MACOSX/*"
+          
     artifacts:
       - GreenWave.ipa
