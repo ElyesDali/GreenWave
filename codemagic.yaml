@@ -27,13 +27,20 @@ workflows:
           pod install
       - name: Build iOS app & Create IPA for AltStore
         script: |
-          # 1. Compilation de l'application
+          # 1. Compilation
           flutter build ios --release --no-codesign
           
-          # 2. Technique Payload automatisée avec préservation des Symlinks (-y)
-          cd build/ios/iphoneos
+          # 2. On s'assure d'être à la racine du projet
+          cd $CM_BUILD_DIR
+          rm -rf Payload GreenWave.ipa
           mkdir Payload
-          mv Runner.app Payload/
+          
+          # 3. On trouve le Runner.app (peu importe où Flutter l'a mis) et on le copie
+          APP_PATH=$(find build -name "Runner.app" -type d | head -n 1)
+          cp -Rp "$APP_PATH" Payload/
+          
+          # 4. Création du fichier .ipa final
           zip -ry GreenWave.ipa Payload
+          
     artifacts:
-      - build/ios/iphoneos/GreenWave.ipa
+      - GreenWave.ipa
