@@ -67,17 +67,17 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-    <string>GreenWave a besoin de votre position pour afficher votre progression sur la carte et calculer l'arrivée au feu vert.</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>GreenWave utilise votre position, même en arrière-plan, pour vous alerter de la vitesse optimale à adopter.</string>
-    <key>NSLocationAlwaysUsageDescription</key>
-    <string>Le GPS est nécessaire en permanence pour assurer la prédiction des feux en temps réel pendant votre trajet.</string>
-
-    <key>UIBackgroundModes</key>
-    <array>
-        <string>location</string>
-        <string>audio</string>
-        <string>fetch</string>
-        <string>remote-notification</string>
-    </array>
+        <string>GreenWave a besoin de votre position pour afficher votre progression sur la carte et calculer l'arrivée au feu vert.</string>
+        <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+        <string>GreenWave utilise votre position, même en arrière-plan, pour vous alerter de la vitesse optimale à adopter.</string>
+        <key>NSLocationAlwaysUsageDescription</key>
+        <string>Le GPS est nécessaire en permanence pour assurer la prédiction des feux en temps réel pendant votre trajet.</string>
+        <key>UIBackgroundModes</key>
+        <array>
+            <string>location</string>
+            <string>audio</string>
+            <string>fetch</string>
+            <string>remote-notification</string>
+        </array>
+    </dict>
 </plist>
