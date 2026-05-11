@@ -1,0 +1,47 @@
+name: greenwave_gps
+description: Navigation GPS autonome avec prédiction feux rouges + vitesse MINIMALE pour arriver au VERT (0s d'arrêt).
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Navigation & Map
+  mapbox_maps_flutter: ^2.0.0
+
+  # Location & GPS
+  geolocator: ^13.0.0
+  permission_handler: ^11.3.1
+
+  # State Management
+  flutter_riverpod: ^2.4.9
+
+  # Network & Data
+  dio: ^5.4.0
+
+  # Voice guidance (Text-to-Speech)
+  flutter_tts: ^4.2.0
+
+  # UI & Styling
+  google_fonts: ^6.1.0
+
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icons/
+    - assets/sounds/
+    - assets/mock_data/

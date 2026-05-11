@@ -1,0 +1,17 @@
+[
+  {"lat": 48.8566, "lon": 2.3522, "cycleRouge": 40, "cycleVert": 20, "offset": 0},
+  {"lat": 48.8512, "lon": 2.2885, "cycleRouge": 40, "cycleVert": 20, "offset": 12},
+  {"lat": 48.8530, "lon": 2.2900, "cycleRouge": 35, "cycleVert": 25, "offset": 8},
+  {"lat": 48.8545, "lon": 2.2870, "cycleRouge": 40, "cycleVert": 20, "offset": 18},
+  {"lat": 48.8498, "lon": 2.2920, "cycleRouge": 45, "cycleVert": 15, "offset": 30},
+  {"lat": 48.8575, "lon": 2.3400, "cycleRouge": 40, "cycleVert": 20, "offset": 5},
+  {"lat": 48.8600, "lon": 2.3450, "cycleRouge": 35, "cycleVert": 25, "offset": 22},
+  {"lat": 48.8555, "lon": 2.3480, "cycleRouge": 40, "cycleVert": 20, "offset": 15},
+  {"lat": 48.8920, "lon": 2.1278, "cycleRouge": 35, "cycleVert": 25, "offset": 5},
+  {"lat": 48.8935, "lon": 2.1300, "cycleRouge": 40, "cycleVert": 20, "offset": 10},
+  {"lat": 48.8610, "lon": 2.3350, "cycleRouge": 40, "cycleVert": 20, "offset": 28},
+  {"lat": 48.8480, "lon": 2.3500, "cycleRouge": 35, "cycleVert": 25, "offset": 3},
+  {"lat": 48.8700, "lon": 2.3200, "cycleRouge": 40, "cycleVert": 20, "offset": 17},
+  {"lat": 48.8650, "lon": 2.3100, "cycleRouge": 45, "cycleVert": 15, "offset": 35},
+  {"lat": 48.8520, "lon": 2.2890, "cycleRouge": 40, "cycleVert": 20, "offset": 25}
+]
