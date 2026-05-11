@@ -66,5 +66,14 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+    <string>GreenWave a besoin de votre position pour vous guider jusqu'au feu vert.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>GreenWave utilise le GPS en arrière-plan pour la prédiction des feux rouges.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>location</string>
+        <string>audio</string>
+    </array>
 </dict>
 </plist>
