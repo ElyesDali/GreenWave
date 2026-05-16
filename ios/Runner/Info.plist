@@ -80,6 +80,6 @@
             <string>remote-notification</string>
         </array>
 	<key>MBXAccessToken</key>
-	<string>pk.eyJ1IjoiY3JpcHRvcmUiLCJhIjoiY21tdDFnNGM1MW5lbTJxc2Q4bzl2OHVtbCJ9.wrN_jj90xlFf9JkrBalinQ</string>
+		<string>pk.eyJ1IjoiY3JpcHRvcmUiLCJhIjoiY21tdDFnNGM1MW5lbTJxc2Q4bzl2OHVtbCJ9.wrN_jj90xlFf9JkrBalinQ</string>
     </dict>
 </plist>
