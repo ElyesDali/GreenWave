@@ -109,6 +109,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (route != null && _mapboxMap != null) {
         await _drawRoute(route);
         await _addDestinationMarker(result);
+        
+        // AJOUTE CETTE LIGNE ICI :
+        await _drawTrafficLights(route.routeCoordinates);
 
         // Zoomer pour voir toute la route
         final bounds = _calculateBounds(route.routeCoordinates);
@@ -167,48 +170,71 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ));
   }
 
-  /// Affiche les feux tricolores sur la carte
-  Future<void> _drawTrafficLights() async {
+  /// Génère et affiche des feux tricolores simulés le long du trajet
+  Future<void> _drawTrafficLights(List<List<double>> routeCoords) async {
     final map = _mapboxMap!;
 
-    // 1. On nettoie les anciens feux si la route change
+    // 1. Nettoyage des anciens feux
     try {
-      await map.style.removeStyleLayer('traffic-lights-layer');
-      await map.style.removeStyleSource('traffic-lights-source');
+      await map.style.removeStyleLayer('red-lights-layer');
+      await map.style.removeStyleLayer('green-lights-layer');
+      await map.style.removeStyleSource('red-lights-source');
+      await map.style.removeStyleSource('green-lights-source');
     } catch (_) {}
 
-    // 2. Exemple de données : tes feux (Mock data)
-    final geoJson = json.encode({
-      'type': 'FeatureCollection',
-      'features': [
-        {
-          'type': 'Feature',
-          'geometry': {'type': 'Point', 'coordinates': [2.3522, 48.8566]}, 
-          'properties': {'id': 'feu_1'} 
-        },
-        {
-          'type': 'Feature',
-          'geometry': {'type': 'Point', 'coordinates': [2.3530, 48.8570]}, 
-          'properties': {'id': 'feu_2'} 
+    List<Map<String, dynamic>> redFeatures = [];
+    List<Map<String, dynamic>> greenFeatures = [];
+
+    // 2. On génère un feu toutes les 20 coordonnées sur la route
+    for (int i = 10; i < routeCoords.length - 10; i += 20) {
+      final isGreen = (i % 40 == 10); // Alterne un feu vert, un feu rouge
+      
+      final feature = {
+        'type': 'Feature',
+        'geometry': {
+          'type': 'Point',
+          'coordinates': [routeCoords[i][0], routeCoords[i][1]]
         }
-      ]
-    });
+      };
 
-    // 3. On ajoute la source de données à la carte
-    await map.style.addSource(GeoJsonSource(
-      id: 'traffic-lights-source',
-      data: geoJson,
-    ));
+      if (isGreen) {
+        greenFeatures.add(feature);
+      } else {
+        redFeatures.add(feature);
+      }
+    }
 
-    // 4. On dessine les points avec une couleur fixe pour éviter le crash Dart
-    await map.style.addLayer(CircleLayer(
-      id: 'traffic-lights-layer',
-      sourceId: 'traffic-lights-source',
-      circleRadius: 8.0,
-      circleColor: Colors.orangeAccent.toARGB32(), // <-- LA CORRECTION EST ICI
-      circleStrokeColor: Colors.white.toARGB32(),
-      circleStrokeWidth: 2.0,
-    ));
+    // 3. Création du calque des feux ROUGES
+    if (redFeatures.isNotEmpty) {
+      await map.style.addSource(GeoJsonSource(
+        id: 'red-lights-source',
+        data: json.encode({'type': 'FeatureCollection', 'features': redFeatures}),
+      ));
+      await map.style.addLayer(CircleLayer(
+        id: 'red-lights-layer',
+        sourceId: 'red-lights-source',
+        circleRadius: 7.0,
+        circleColor: Colors.redAccent.toARGB32(),
+        circleStrokeColor: Colors.white.toARGB32(),
+        circleStrokeWidth: 2.0,
+      ));
+    }
+
+    // 4. Création du calque des feux VERTS
+    if (greenFeatures.isNotEmpty) {
+      await map.style.addSource(GeoJsonSource(
+        id: 'green-lights-source',
+        data: json.encode({'type': 'FeatureCollection', 'features': greenFeatures}),
+      ));
+      await map.style.addLayer(CircleLayer(
+        id: 'green-lights-layer',
+        sourceId: 'green-lights-source',
+        circleRadius: 7.0,
+        circleColor: Colors.greenAccent.toARGB32(),
+        circleStrokeColor: Colors.white.toARGB32(),
+        circleStrokeWidth: 2.0,
+      ));
+    }
   }
 
   /// Ajoute un marqueur cercle à la destination
@@ -256,6 +282,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// Annule la navigation en cours
+  /// Annule la navigation en cours
   void _cancelRoute() async {
     ref.read(destinationProvider.notifier).state = null;
     try {
@@ -263,8 +290,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await _mapboxMap?.style.removeStyleSource('route-source');
       await _mapboxMap?.style.removeStyleLayer('dest-layer');
       await _mapboxMap?.style.removeStyleSource('dest-source');
+      
+      // AJOUTE CES 4 LIGNES :
+      await _mapboxMap?.style.removeStyleLayer('red-lights-layer');
+      await _mapboxMap?.style.removeStyleSource('red-lights-source');
+      await _mapboxMap?.style.removeStyleLayer('green-lights-layer');
+      await _mapboxMap?.style.removeStyleSource('green-lights-source');
     } catch (_) {}
     setState(() {
+// ...
       _routeActive = false;
       _searchController.clear();
     });
