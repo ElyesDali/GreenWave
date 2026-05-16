@@ -79,6 +79,10 @@ workflows:
             <true/>
             <key>UIApplicationSupportsIndirectInputEvents</key>
             <true/>
+            
+            <key>MBXAccessToken</key>
+            <string>pk.eyJ1IjoiY3JpcHRvcmUiLCJhIjoiY21tdDFnNGM1MW5lbTJxc2Q4bzl2OHVtbCJ9.wrN_jj90xlFf9JkrBalinQ</string>
+
             <key>NSLocationWhenInUseUsageDescription</key>
             <string>GreenWave a besoin de votre position pour le guidage.</string>
             <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

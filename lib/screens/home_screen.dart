@@ -242,10 +242,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Positioned.fill(
             child: MapWidget(
               key: const ValueKey("mapWidget"),
-              // On force le token ICI pour être sûr que la carte iOS le lit
-              resourceOptions: ResourceOptions(
-                accessToken: "pk.eyJ1IjoiY3JpcHRvcmUiLCJhIjoiY21tdDFnNGM1MW5lbTJxc2Q4bzl2OHVtbCJ9.wrN_jj90xlFf9JkrBalinQ",
-              ),
               onMapCreated: _onMapCreated,
               styleUri: MapboxStyles.DARK,
               cameraOptions: CameraOptions(
