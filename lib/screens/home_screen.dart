@@ -167,6 +167,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ));
   }
 
+  /// Affiche les feux tricolores sur la carte
+  Future<void> _drawTrafficLights() async {
+    final map = _mapboxMap!;
+
+    // 1. On nettoie les anciens feux si la route change
+    try {
+      await map.style.removeStyleLayer('traffic-lights-layer');
+      await map.style.removeStyleSource('traffic-lights-source');
+    } catch (_) {}
+
+    // 2. Exemple de données : tes feux (Idéalement, ça viendra de ton mock_data)
+    // Ici, un format GeoJSON avec une propriété "color" pour simuler l'état
+    final geoJson = json.encode({
+      'type': 'FeatureCollection',
+      'features': [
+        {
+          'type': 'Feature',
+          'geometry': {'type': 'Point', 'coordinates': [2.3522, 48.8566]}, // Feu 1
+          'properties': {'color': 'red'} // Feu rouge
+        },
+        {
+          'type': 'Feature',
+          'geometry': {'type': 'Point', 'coordinates': [2.3530, 48.8570]}, // Feu 2
+          'properties': {'color': 'green'} // Feu vert
+        }
+      ]
+    });
+
+    // 3. On ajoute la source de données à la carte
+    await map.style.addSource(GeoJsonSource(
+      id: 'traffic-lights-source',
+      data: geoJson,
+    ));
+
+    // 4. On dessine les points avec des couleurs dynamiques !
+    await map.style.addLayer(CircleLayer(
+      id: 'traffic-lights-layer',
+      sourceId: 'traffic-lights-source',
+      circleRadius: 8.0,
+      // La magie Mapbox : on lit la propriété 'color' de chaque feu
+      circleColor: [
+        'match',
+        ['get', 'color'],
+        'red', Colors.redAccent.toARGB32(),
+        'green', Colors.greenAccent.toARGB32(),
+        'orange', Colors.orangeAccent.toARGB32(),
+        Colors.grey.toARGB32() // Couleur par défaut
+      ],
+      circleStrokeColor: Colors.white.toARGB32(),
+      circleStrokeWidth: 2.0,
+    ));
+  }
+  
   /// Ajoute un marqueur cercle à la destination
   Future<void> _addDestinationMarker(GeocodingResult dest) async {
     final map = _mapboxMap!;
