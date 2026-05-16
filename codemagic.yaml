@@ -118,9 +118,9 @@ workflows:
           mkdir Payload
           
           if [ -d "build/ios/iphoneos/Runner.app" ]; then
-            cp -RL build/ios/iphoneos/Runner.app Payload/\
+            cp -RL build/ios/iphoneos/Runner.app Payload/
           elif [ -d "build/ios/Release-iphoneos/Runner.app" ]; then
-            cp -RL build/ios/Release-iphoneos/Runner.app Payload/\
+            cp -RL build/ios/Release-iphoneos/Runner.app Payload/
           fi
           
           # Zippage clean
