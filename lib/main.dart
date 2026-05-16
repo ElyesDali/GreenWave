@@ -7,7 +7,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Initialisation du jeton Mapbox. (À replacer par votre vraie clé depuis un env ou direct)
-  MapboxOptions.setAccessToken("pk.eyJ1IjoiY3JpcHRvcmUiLCJhIjoiY21tdDFnNGM1MW5lbTJxc2Q4bzl2OHVtbCJ9.wrN_jj90xlFf9JkrBalinQ"); // User provided token
+  MapboxOptions.setAccessToken("pk.eyJ1IjoibWlzdGVyZTEwIiwiYSI6ImNtcDh5MzFxajBjdzQyc3F1ejdnN2J6ZmwifQ.kL9x8VkcfnAb3fwfEW20rg"); // User provided token
 
   runApp(
     const ProviderScope(

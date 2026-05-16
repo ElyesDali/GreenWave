@@ -27,7 +27,7 @@ workflows:
           cd ios
           pod install
           
-      - name: REPARATION AUTOMATIQUE (Bypass Windows Encoding)
+      - name: REPARATION AUTOMATIQUE (Bypass Windows Encoding & ATS)
         script: |
           cat << 'EOF' > ios/Runner/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
@@ -80,8 +80,14 @@ workflows:
             <key>UIApplicationSupportsIndirectInputEvents</key>
             <true/>
             
+            <key>NSAppTransportSecurity</key>
+            <dict>
+              <key>NSAllowsArbitraryLoads</key>
+              <true/>
+            </dict>
+            
             <key>MBXAccessToken</key>
-            <string>pk.eyJ1IjoiY3JpcHRvcmUiLCJhIjoiY21tdDFnNGM1MW5lbTJxc2Q4bzl2OHVtbCJ9.wrN_jj90xlFf9JkrBalinQ</string>
+            <string>pk.eyJ1IjoibWlzdGVyZTEwIiwiYSI6ImNtcDh5MzFxajBjdzQyc3F1ejdnN2J6ZmwifQ.kL9x8VkcfnAb3fwfEW20rg</string>
 
             <key>NSLocationWhenInUseUsageDescription</key>
             <string>GreenWave a besoin de votre position pour le guidage.</string>
@@ -112,9 +118,9 @@ workflows:
           mkdir Payload
           
           if [ -d "build/ios/iphoneos/Runner.app" ]; then
-            cp -RL build/ios/iphoneos/Runner.app Payload/
+            cp -RL build/ios/iphoneos/Runner.app Payload/\
           elif [ -d "build/ios/Release-iphoneos/Runner.app" ]; then
-            cp -RL build/ios/Release-iphoneos/Runner.app Payload/
+            cp -RL build/ios/Release-iphoneos/Runner.app Payload/\
           fi
           
           # Zippage clean
