@@ -177,20 +177,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await map.style.removeStyleSource('traffic-lights-source');
     } catch (_) {}
 
-    // 2. Exemple de données : tes feux (Idéalement, ça viendra de ton mock_data)
-    // Ici, un format GeoJSON avec une propriété "color" pour simuler l'état
+    // 2. Exemple de données : tes feux (Mock data)
     final geoJson = json.encode({
       'type': 'FeatureCollection',
       'features': [
         {
           'type': 'Feature',
-          'geometry': {'type': 'Point', 'coordinates': [2.3522, 48.8566]}, // Feu 1
-          'properties': {'color': 'red'} // Feu rouge
+          'geometry': {'type': 'Point', 'coordinates': [2.3522, 48.8566]}, 
+          'properties': {'id': 'feu_1'} 
         },
         {
           'type': 'Feature',
-          'geometry': {'type': 'Point', 'coordinates': [2.3530, 48.8570]}, // Feu 2
-          'properties': {'color': 'green'} // Feu vert
+          'geometry': {'type': 'Point', 'coordinates': [2.3530, 48.8570]}, 
+          'properties': {'id': 'feu_2'} 
         }
       ]
     });
@@ -201,25 +200,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       data: geoJson,
     ));
 
-    // 4. On dessine les points avec des couleurs dynamiques !
+    // 4. On dessine les points avec une couleur fixe pour éviter le crash Dart
     await map.style.addLayer(CircleLayer(
       id: 'traffic-lights-layer',
       sourceId: 'traffic-lights-source',
       circleRadius: 8.0,
-      // La magie Mapbox : on lit la propriété 'color' de chaque feu
-      circleColor: [
-        'match',
-        ['get', 'color'],
-        'red', Colors.redAccent.toARGB32(),
-        'green', Colors.greenAccent.toARGB32(),
-        'orange', Colors.orangeAccent.toARGB32(),
-        Colors.grey.toARGB32() // Couleur par défaut
-      ],
+      circleColor: Colors.orangeAccent.toARGB32(), // <-- LA CORRECTION EST ICI
       circleStrokeColor: Colors.white.toARGB32(),
       circleStrokeWidth: 2.0,
     ));
   }
-  
+
   /// Ajoute un marqueur cercle à la destination
   Future<void> _addDestinationMarker(GeocodingResult dest) async {
     final map = _mapboxMap!;
