@@ -19,7 +19,7 @@
         <!-- Token PUBLIC Mapbox (pk.) pour le rendu de la carte -->
         <meta-data
             android:name="com.mapbox.token"
-            android:value="pk.eyJ1IjoiY3JpcHRvcmUiLCJhIjoiY21tdDFnNGM1MW5lbTJxc2Q4bzl2OHVtbCJ9.wrN_jj90xlFf9JkrBalinQ" />
+            android:value="pk.eyJ1IjoibWlzdGVyZTEwIiwiYSI6ImNtcDh5MzFxajBjdzQyc3F1ejdnN2J6ZmwifQ.kL9x8VkcfnAb3fwfEW20rg" />
 
         <activity
             android:name=".MainActivity"
