@@ -140,13 +140,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (radiusKm < 2.0) radiusKm = 2.0;
         if (radiusKm > 50.0) radiusKm = 50.0; // Limite pour l'API
         
-        // Afficher les vrais feux tricolores uniquement s'ils sont sur le trajet
+        // Afficher tous les feux tricolores de la zone
         final service = ref.read(trafficLightServiceProvider);
         final allLights = await service.fetchTrafficLights(centerLat, centerLon, radiusKm: radiusKm);
         
-        final routeLights = _filterLightsOnRoute(allLights, route.routeCoordinates);
-        await _drawTrafficLights(routeLights);
-        _startTrafficLightsTimer(routeLights);
+        await _drawTrafficLights(allLights);
+        _startTrafficLightsTimer(allLights);
 
         // Zoomer pour voir toute la route
         _mapboxMap!.setCamera(CameraOptions(
@@ -204,46 +203,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ));
   }
 
-  /// Filtre les feux pour ne garder que ceux proches de la route (40 mètres)
-  List<TrafficLight> _filterLightsOnRoute(List<TrafficLight> allLights, List<List<double>> routeCoords) {
-    if (routeCoords.isEmpty) return [];
-    List<TrafficLight> routeLights = [];
-    
-    // Interpolation des points du tracé pour avoir un point environ tous les 20 mètres
-    List<List<double>> denseCoords = [];
-    for (int i = 0; i < routeCoords.length - 1; i++) {
-      final p1 = routeCoords[i];
-      final p2 = routeCoords[i+1];
-      denseCoords.add(p1);
-      
-      final dLat = p2[1] - p1[1];
-      final dLon = p2[0] - p1[0];
-      final distDegree = math.sqrt(dLat*dLat + dLon*dLon);
-      final steps = (distDegree / 0.0002).ceil(); // ~20 mètres (0.0002 deg)
-      
-      for (int j = 1; j < steps; j++) {
-        denseCoords.add([
-          p1[0] + dLon * (j / steps),
-          p1[1] + dLat * (j / steps)
-        ]);
-      }
-    }
-    denseCoords.add(routeCoords.last);
-
-    for (final light in allLights) {
-      bool isOnRoute = false;
-      for (final coord in denseCoords) {
-        // approx 0.0004 deg = ~40m
-        if ((coord[1] - light.latitude).abs() < 0.0004 && 
-            (coord[0] - light.longitude).abs() < 0.0004) {
-          isOnRoute = true;
-          break;
-        }
-      }
-      if (isOnRoute) routeLights.add(light);
-    }
-    return routeLights;
-  }
+  // Suppression de _filterLightsOnRoute
 
   /// Démarre le timer pour rafraichir la couleur des feux en temps réel
   void _startTrafficLightsTimer(List<TrafficLight> lights) {
