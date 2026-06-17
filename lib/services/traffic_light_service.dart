@@ -29,19 +29,7 @@ class TrafficLightService {
       return _cachedLights!;
     }
 
-    // 1. Essayer Overpass API (OpenStreetMap)
-    try {
-      final lights = await _fetchFromOverpass(lat, lon, radiusKm);
-      if (lights.isNotEmpty) {
-        _cachedLights = lights;
-        _cacheTime = DateTime.now();
-        return lights;
-      }
-    } catch (e) {
-      debugPrint("Overpass API indisponible: $e");
-    }
-
-    // 2. Essayer data.gouv.fr Paris OpenData (feux tricolores Paris)
+    // 1. Essayer data.gouv.fr Paris OpenData (feux tricolores Paris) en priorité
     try {
       final lights = await _fetchFromParisOpenData(lat, lon);
       if (lights.isNotEmpty) {
@@ -51,6 +39,18 @@ class TrafficLightService {
       }
     } catch (e) {
       debugPrint("Paris OpenData indisponible: $e");
+    }
+
+    // 2. Essayer Overpass API (OpenStreetMap) en fallback hors de Paris
+    try {
+      final lights = await _fetchFromOverpass(lat, lon, radiusKm);
+      if (lights.isNotEmpty) {
+        _cachedLights = lights;
+        _cacheTime = DateTime.now();
+        return lights;
+      }
+    } catch (e) {
+      debugPrint("Overpass API indisponible: $e");
     }
 
     // 3. Fallback : cache offline local (assets/mock_data)

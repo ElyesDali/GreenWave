@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
@@ -6,6 +7,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../providers/greenwave_provider.dart';
 import '../services/navigation_service.dart';
+import '../models/traffic_light.dart';
 import 'hud_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -22,6 +24,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   List<GeocodingResult> _searchResults = [];
   bool _showSearchResults = false;
   bool _routeActive = false;
+  Timer? _trafficLightsTimer;
 
   @override
   void initState() {
@@ -123,8 +126,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         await _drawRoute(route);
         await _addDestinationMarker(result);
         
-        // AJOUTE CETTE LIGNE ICI :
-        await _drawTrafficLights(route.routeCoordinates);
+        // Afficher les vrais feux tricolores et démarrer le rafraîchissement
+        final lights = ref.read(trafficLightsProvider).value ?? [];
+        await _drawTrafficLights(lights);
+        _startTrafficLightsTimer(lights);
 
         // Zoomer pour voir toute la route
         final bounds = _calculateBounds(route.routeCoordinates);
@@ -183,8 +188,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ));
   }
 
-  /// Génère et affiche des feux tricolores simulés le long du trajet
-  Future<void> _drawTrafficLights(List<List<double>> routeCoords) async {
+  /// Démarre le timer pour rafraichir la couleur des feux en temps réel
+  void _startTrafficLightsTimer(List<TrafficLight> lights) {
+    _trafficLightsTimer?.cancel();
+    _trafficLightsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _routeActive && _mapboxMap != null) {
+        _drawTrafficLights(lights);
+      }
+    });
+  }
+
+  /// Génère et affiche les feux tricolores réels
+  Future<void> _drawTrafficLights(List<TrafficLight> lights) async {
+    if (lights.isEmpty) return;
     final map = _mapboxMap!;
 
     // 1. Nettoyage des anciens feux
@@ -197,23 +213,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     List<Map<String, dynamic>> redFeatures = [];
     List<Map<String, dynamic>> greenFeatures = [];
+    final now = DateTime.now();
 
-    // 2. On génère un feu toutes les 20 coordonnées sur la route
-    for (int i = 10; i < routeCoords.length - 10; i += 20) {
-      final isGreen = (i % 40 == 10); // Alterne un feu vert, un feu rouge
+    // 2. On trie les feux en fonction de leur état actuel
+    for (final light in lights) {
+      final isRed = light.isRedAt(now);
       
       final feature = {
         'type': 'Feature',
         'geometry': {
           'type': 'Point',
-          'coordinates': [routeCoords[i][0], routeCoords[i][1]]
+          'coordinates': [light.longitude, light.latitude]
         }
       };
 
-      if (isGreen) {
-        greenFeatures.add(feature);
-      } else {
+      if (isRed) {
         redFeatures.add(feature);
+      } else {
+        greenFeatures.add(feature);
       }
     }
 
@@ -297,6 +314,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// Annule la navigation en cours
   /// Annule la navigation en cours
   void _cancelRoute() async {
+    _trafficLightsTimer?.cancel();
+    _trafficLightsTimer = null;
     ref.read(destinationProvider.notifier).state = null;
     try {
       await _mapboxMap?.style.removeStyleLayer('route-layer');
@@ -319,6 +338,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
+    _trafficLightsTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
