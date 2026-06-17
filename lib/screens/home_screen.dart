@@ -25,6 +25,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _showSearchResults = false;
   bool _routeActive = false;
   Timer? _trafficLightsTimer;
+  bool _isDrawingLights = false;
 
   @override
   void initState() {
@@ -126,10 +127,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         await _drawRoute(route);
         await _addDestinationMarker(result);
         
-        // Afficher les vrais feux tricolores et démarrer le rafraîchissement
-        final lights = ref.read(trafficLightsProvider).value ?? [];
-        await _drawTrafficLights(lights);
-        _startTrafficLightsTimer(lights);
+        // Afficher les vrais feux tricolores uniquement s'ils sont sur le trajet
+        final allLights = ref.read(trafficLightsProvider).value ?? [];
+        final routeLights = _filterLightsOnRoute(allLights, route.routeCoordinates);
+        await _drawTrafficLights(routeLights);
+        _startTrafficLightsTimer(routeLights);
 
         // Zoomer pour voir toute la route
         final bounds = _calculateBounds(route.routeCoordinates);
@@ -188,10 +190,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ));
   }
 
+  /// Filtre les feux pour ne garder que ceux proches de la route (40 mètres)
+  List<TrafficLight> _filterLightsOnRoute(List<TrafficLight> allLights, List<List<double>> routeCoords) {
+    if (routeCoords.isEmpty) return [];
+    List<TrafficLight> routeLights = [];
+    for (final light in allLights) {
+      bool isOnRoute = false;
+      for (final coord in routeCoords) {
+        // approx 0.0004 deg = ~40m
+        if ((coord[1] - light.latitude).abs() < 0.0004 && 
+            (coord[0] - light.longitude).abs() < 0.0004) {
+          isOnRoute = true;
+          break;
+        }
+      }
+      if (isOnRoute) routeLights.add(light);
+    }
+    return routeLights;
+  }
+
   /// Démarre le timer pour rafraichir la couleur des feux en temps réel
   void _startTrafficLightsTimer(List<TrafficLight> lights) {
     _trafficLightsTimer?.cancel();
-    _trafficLightsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _trafficLightsTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (mounted && _routeActive && _mapboxMap != null) {
         _drawTrafficLights(lights);
       }
@@ -200,72 +221,79 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// Génère et affiche les feux tricolores réels
   Future<void> _drawTrafficLights(List<TrafficLight> lights) async {
-    if (lights.isEmpty) return;
+    if (lights.isEmpty || _isDrawingLights) return;
+    _isDrawingLights = true;
     final map = _mapboxMap!;
 
-    // 1. Nettoyage des anciens feux
     try {
-      await map.style.removeStyleLayer('red-lights-layer');
-      await map.style.removeStyleLayer('green-lights-layer');
-      await map.style.removeStyleSource('red-lights-source');
-      await map.style.removeStyleSource('green-lights-source');
-    } catch (_) {}
+      // 1. Nettoyage des anciens feux
+      try {
+        await map.style.removeStyleLayer('red-lights-layer');
+        await map.style.removeStyleLayer('green-lights-layer');
+        await map.style.removeStyleSource('red-lights-source');
+        await map.style.removeStyleSource('green-lights-source');
+      } catch (_) {}
 
-    List<Map<String, dynamic>> redFeatures = [];
-    List<Map<String, dynamic>> greenFeatures = [];
-    final now = DateTime.now();
+      List<Map<String, dynamic>> redFeatures = [];
+      List<Map<String, dynamic>> greenFeatures = [];
+      final now = DateTime.now();
 
-    // 2. On trie les feux en fonction de leur état actuel
-    for (final light in lights) {
-      final isRed = light.isRedAt(now);
-      
-      final feature = {
-        'type': 'Feature',
-        'geometry': {
-          'type': 'Point',
-          'coordinates': [light.longitude, light.latitude]
+      // 2. On trie les feux en fonction de leur état actuel
+      for (final light in lights) {
+        final isRed = light.isRedAt(now);
+        
+        final feature = {
+          'type': 'Feature',
+          'geometry': {
+            'type': 'Point',
+            'coordinates': [light.longitude, light.latitude]
+          }
+        };
+
+        if (isRed) {
+          redFeatures.add(feature);
+        } else {
+          greenFeatures.add(feature);
         }
-      };
-
-      if (isRed) {
-        redFeatures.add(feature);
-      } else {
-        greenFeatures.add(feature);
       }
-    }
 
-    // 3. Création du calque des feux ROUGES
-    if (redFeatures.isNotEmpty) {
-      await map.style.addSource(GeoJsonSource(
-        id: 'red-lights-source',
-        data: json.encode({'type': 'FeatureCollection', 'features': redFeatures}),
-      ));
-      await map.style.addLayer(CircleLayer(
-        id: 'red-lights-layer',
-        sourceId: 'red-lights-source',
-        circleRadius: 7.0,
-        circleColor: Colors.redAccent.toARGB32(),
-        circleStrokeColor: Colors.white.toARGB32(),
-        circleStrokeWidth: 2.0,
-      ));
-    }
+      // 3. Création du calque des feux ROUGES
+      if (redFeatures.isNotEmpty) {
+        await map.style.addSource(GeoJsonSource(
+          id: 'red-lights-source',
+          data: json.encode({'type': 'FeatureCollection', 'features': redFeatures}),
+        ));
+        await map.style.addLayer(CircleLayer(
+          id: 'red-lights-layer',
+          sourceId: 'red-lights-source',
+          circleRadius: 7.0,
+          circleColor: Colors.redAccent.toARGB32(),
+          circleStrokeColor: Colors.white.toARGB32(),
+          circleStrokeWidth: 2.0,
+        ));
+      }
 
-    // 4. Création du calque des feux VERTS
-    if (greenFeatures.isNotEmpty) {
-      await map.style.addSource(GeoJsonSource(
-        id: 'green-lights-source',
-        data: json.encode({'type': 'FeatureCollection', 'features': greenFeatures}),
-      ));
-      await map.style.addLayer(CircleLayer(
-        id: 'green-lights-layer',
-        sourceId: 'green-lights-source',
-        circleRadius: 7.0,
-        circleColor: Colors.greenAccent.toARGB32(),
-        circleStrokeColor: Colors.white.toARGB32(),
-        circleStrokeWidth: 2.0,
-      ));
+      // 4. Création du calque des feux VERTS
+      if (greenFeatures.isNotEmpty) {
+        await map.style.addSource(GeoJsonSource(
+          id: 'green-lights-source',
+          data: json.encode({'type': 'FeatureCollection', 'features': greenFeatures}),
+        ));
+        await map.style.addLayer(CircleLayer(
+          id: 'green-lights-layer',
+          sourceId: 'green-lights-source',
+          circleRadius: 7.0,
+          circleColor: Colors.greenAccent.toARGB32(),
+          circleStrokeColor: Colors.white.toARGB32(),
+          circleStrokeWidth: 2.0,
+        ));
+      }
+    } finally {
+      _isDrawingLights = false;
     }
   }
+
+// Rien, remplacé plus haut
 
   /// Ajoute un marqueur cercle à la destination
   Future<void> _addDestinationMarker(GeocodingResult dest) async {

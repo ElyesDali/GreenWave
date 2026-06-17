@@ -29,28 +29,40 @@ class TrafficLightService {
       return _cachedLights!;
     }
 
-    // 1. Essayer data.gouv.fr Paris OpenData (feux tricolores Paris) en priorité
-    try {
-      final lights = await _fetchFromParisOpenData(lat, lon);
-      if (lights.isNotEmpty) {
-        _cachedLights = lights;
-        _cacheTime = DateTime.now();
-        return lights;
+    List<TrafficLight> allLights = [];
+
+    // Lancer les deux requêtes en parallèle pour avoir tous les feux (Paris + reste)
+    final results = await Future.wait([
+      _fetchFromParisOpenData(lat, lon).catchError((e) {
+        debugPrint("Paris OpenData indisponible: $e");
+        return <TrafficLight>[];
+      }),
+      _fetchFromOverpass(lat, lon, radiusKm).catchError((e) {
+        debugPrint("Overpass API indisponible: $e");
+        return <TrafficLight>[];
+      }),
+    ]);
+
+    allLights.addAll(results[0]);
+    allLights.addAll(results[1]);
+
+    // Déduplication simple (feux à moins de ~10 mètres considérés comme identiques)
+    final List<TrafficLight> deduplicated = [];
+    for (final light in allLights) {
+      bool exists = false;
+      for (final existing in deduplicated) {
+        if (_quickDist(light.latitude, light.longitude, existing.latitude, existing.longitude) < 100) { // 10m * 10m = 100m²
+          exists = true;
+          break;
+        }
       }
-    } catch (e) {
-      debugPrint("Paris OpenData indisponible: $e");
+      if (!exists) deduplicated.add(light);
     }
 
-    // 2. Essayer Overpass API (OpenStreetMap) en fallback hors de Paris
-    try {
-      final lights = await _fetchFromOverpass(lat, lon, radiusKm);
-      if (lights.isNotEmpty) {
-        _cachedLights = lights;
-        _cacheTime = DateTime.now();
-        return lights;
-      }
-    } catch (e) {
-      debugPrint("Overpass API indisponible: $e");
+    if (deduplicated.isNotEmpty) {
+      _cachedLights = deduplicated;
+      _cacheTime = DateTime.now();
+      return deduplicated;
     }
 
     // 3. Fallback : cache offline local (assets/mock_data)
