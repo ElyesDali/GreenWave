@@ -83,6 +83,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     } catch (e) {
       debugPrint("Erreur geocoding: $e");
+      // On affiche l'erreur directement sur l'écran de l'iPhone !
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Erreur recherche : $e", 
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
