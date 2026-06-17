@@ -33,7 +33,7 @@ class TrafficLightService {
 
     // Lancer les deux requêtes en parallèle pour avoir tous les feux (Paris + reste)
     final results = await Future.wait([
-      _fetchFromParisOpenData(lat, lon).catchError((e) {
+      _fetchFromParisOpenData(lat, lon, radiusKm).catchError((e) {
         debugPrint("Paris OpenData indisponible: $e");
         return <TrafficLight>[];
       }),
@@ -106,14 +106,15 @@ out body;
 
   /// Paris OpenData : feux tricolores via l'API data.gouv.fr / opendata.paris.fr
   Future<List<TrafficLight>> _fetchFromParisOpenData(
-    double lat, double lon
+    double lat, double lon, double radiusKm
   ) async {
+    final radiusMeters = (radiusKm * 1000).toInt();
     // API Paris OpenData - catalogue des feux tricolores
     final response = await _dio.get(
       'https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/signalisation-tricolore/records',
       queryParameters: {
         'limit': 100,
-        'geofilter.distance': '$lat,$lon,2000', // rayon 2km
+        'geofilter.distance': '$lat,$lon,$radiusMeters',
       },
     );
 

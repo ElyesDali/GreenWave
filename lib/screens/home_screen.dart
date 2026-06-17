@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
@@ -126,19 +127,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (route != null && _mapboxMap != null) {
         await _drawRoute(route);
         await _addDestinationMarker(result);
+
+        // Calcul de la zone couverte par la route
+        final bounds = _calculateBounds(route.routeCoordinates);
+        final centerLat = (bounds[1] + bounds[3]) / 2;
+        final centerLon = (bounds[0] + bounds[2]) / 2;
+        
+        // Rayon approximatif en kilomètres
+        final dLat = (bounds[3] - bounds[1]) * 111.0;
+        final dLon = (bounds[2] - bounds[0]) * 78.5;
+        double radiusKm = math.sqrt(dLat*dLat + dLon*dLon) / 2.0;
+        if (radiusKm < 2.0) radiusKm = 2.0;
+        if (radiusKm > 50.0) radiusKm = 50.0; // Limite pour l'API
         
         // Afficher les vrais feux tricolores uniquement s'ils sont sur le trajet
-        final allLights = ref.read(trafficLightsProvider).value ?? [];
+        final service = ref.read(trafficLightServiceProvider);
+        final allLights = await service.fetchTrafficLights(centerLat, centerLon, radiusKm: radiusKm);
+        
         final routeLights = _filterLightsOnRoute(allLights, route.routeCoordinates);
         await _drawTrafficLights(routeLights);
         _startTrafficLightsTimer(routeLights);
 
         // Zoomer pour voir toute la route
-        final bounds = _calculateBounds(route.routeCoordinates);
         _mapboxMap!.setCamera(CameraOptions(
           center: Point(coordinates: Position(
-            (bounds[0] + bounds[2]) / 2,
-            (bounds[1] + bounds[3]) / 2,
+            centerLon,
+            centerLat,
           )),
           zoom: 12.0,
         ));
@@ -194,9 +208,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   List<TrafficLight> _filterLightsOnRoute(List<TrafficLight> allLights, List<List<double>> routeCoords) {
     if (routeCoords.isEmpty) return [];
     List<TrafficLight> routeLights = [];
+    
+    // Interpolation des points du tracé pour avoir un point environ tous les 20 mètres
+    List<List<double>> denseCoords = [];
+    for (int i = 0; i < routeCoords.length - 1; i++) {
+      final p1 = routeCoords[i];
+      final p2 = routeCoords[i+1];
+      denseCoords.add(p1);
+      
+      final dLat = p2[1] - p1[1];
+      final dLon = p2[0] - p1[0];
+      final distDegree = math.sqrt(dLat*dLat + dLon*dLon);
+      final steps = (distDegree / 0.0002).ceil(); // ~20 mètres (0.0002 deg)
+      
+      for (int j = 1; j < steps; j++) {
+        denseCoords.add([
+          p1[0] + dLon * (j / steps),
+          p1[1] + dLat * (j / steps)
+        ]);
+      }
+    }
+    denseCoords.add(routeCoords.last);
+
     for (final light in allLights) {
       bool isOnRoute = false;
-      for (final coord in routeCoords) {
+      for (final coord in denseCoords) {
         // approx 0.0004 deg = ~40m
         if ((coord[1] - light.latitude).abs() < 0.0004 && 
             (coord[0] - light.longitude).abs() < 0.0004) {
