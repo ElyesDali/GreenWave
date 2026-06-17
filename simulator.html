@@ -269,7 +269,8 @@
         
         // État de la voiture
         let carDistanceTraveled = 0; // en kilomètres
-        const BASE_SPEED_KMH = 35; // Vitesse physique du véhicule simulé
+        let currentSpeedKmh = 0; // Vitesse physique réelle
+        const MAX_SPEED_KMH = 50; // Vitesse limite en ville
 
         // Éléments DOM du HUD
         const elHud = document.getElementById('hud');
@@ -406,6 +407,7 @@
             if (isSimulating) cancelAnimationFrame(animationFrameId);
             
             carDistanceTraveled = 0;
+            currentSpeedKmh = 0;
             isSimulating = true;
             elHud.classList.add('active');
             lastTime = performance.now();
@@ -419,17 +421,124 @@
             const dt = (timestamp - lastTime) / 1000; // Delta time en secondes
             lastTime = timestamp;
 
-            // Fluctuation légère de la vitesse physique pour le réalisme (± 2 km/h)
-            const speedFluctuation = Math.sin(timestamp / 500) * 2;
-            const currentSpeedKmh = BASE_SPEED_KMH + speedFluctuation;
-            const currentSpeedKms = currentSpeedKmh / 3600; // km par seconde
+            // 1. Intelligence Artificielle du "Conducteur"
+            const nextLight = trafficLights.find(l => l.distanceFromStart > carDistanceTraveled);
+            let targetSpeedKmh = MAX_SPEED_KMH;
+            let instructionText = "Chemin libre.";
+            let instructionColor = "#ffffff";
 
-            // Avancer la voiture
+            if (nextLight) {
+                const distKm = nextLight.distanceFromStart - carDistanceTraveled;
+                const distMeters = distKm * 1000;
+                
+                const now = Date.now() / 1000;
+                const secondInCycle = (now + nextLight.offset) % nextLight.cycleDuration;
+                const isRed = secondInCycle < nextLight.redDuration;
+
+                // Mise à jour de l'UI d'information
+                elNextLightDist.innerHTML = `Prochain feu : ${Math.round(distMeters)} m`;
+                if (isRed) {
+                    elNextLightTimer.innerHTML = `Rouge : ${Math.round(nextLight.redDuration - secondInCycle)} s`;
+                    elNextLightTimer.style.color = '#ff4040';
+                } else {
+                    elNextLightTimer.innerHTML = `Vert : ${Math.round(nextLight.cycleDuration - secondInCycle)} s`;
+                    elNextLightTimer.style.color = '#00ff88';
+                }
+
+                // Logique de conduite
+                if (isRed) {
+                    const secondsUntilGreen = nextLight.redDuration - secondInCycle;
+                    const requiredSpeed = (distKm / (secondsUntilGreen / 3600));
+
+                    if (distMeters < 15) {
+                        targetSpeedKmh = 0; // On est au feu, on s'arrête
+                        instructionText = "Arrêt au feu rouge.";
+                        instructionColor = "#ff4040";
+                    } else if (requiredSpeed > MAX_SPEED_KMH) {
+                        // Impossible de l'avoir au vert, on s'approche pour s'arrêter
+                        targetSpeedKmh = Math.min(MAX_SPEED_KMH, distMeters / 3); 
+                        instructionText = "Feu rouge inatteignable. Préparez l'arrêt.";
+                        instructionColor = "#ffaa00";
+                    } else if (requiredSpeed < 10) {
+                        // On doit rouler trop doucement, on s'approche doucement et on attendra
+                        targetSpeedKmh = Math.min(MAX_SPEED_KMH, distMeters / 4);
+                        instructionText = "Feu rouge. Ralentissement progressif.";
+                        instructionColor = "#ffaa00";
+                    } else {
+                        // VAGUE VERTE POSSIBLE !
+                        targetSpeedKmh = requiredSpeed;
+                        instructionText = `Vague verte : roulez à ${Math.round(requiredSpeed)} km/h`;
+                        instructionColor = "#00ff88";
+                    }
+                } else {
+                    const secondsUntilRed = nextLight.cycleDuration - secondInCycle;
+                    const reachTime = (distKm / currentSpeedKmh) * 3600; // si on maintenait
+
+                    if (reachTime < secondsUntilRed - 1) {
+                        targetSpeedKmh = MAX_SPEED_KMH;
+                        instructionText = "Feu vert. Maintenez l'allure.";
+                        instructionColor = "#00ff88";
+                    } else {
+                        // On n'aura pas le temps
+                        if (distMeters < 15) {
+                            targetSpeedKmh = 0;
+                            instructionText = "Passage au rouge imminent. Arrêt.";
+                            instructionColor = "#ff4040";
+                        } else {
+                            targetSpeedKmh = Math.min(MAX_SPEED_KMH, distMeters / 3);
+                            instructionText = "Le feu va passer au rouge. Ralentissez.";
+                            instructionColor = "#ffaa00";
+                        }
+                    }
+                }
+            } else {
+                elNextLightDist.innerHTML = `Prochain feu : Aucun`;
+                elNextLightTimer.innerHTML = ``;
+            }
+
+            // 2. Physique du véhicule (Accélération / Freinage)
+            const ACCELERATION = 12; // km/h par seconde
+            const BRAKING = 25;      // km/h par seconde (freinage plus fort)
+
+            if (currentSpeedKmh < targetSpeedKmh) {
+                currentSpeedKmh += ACCELERATION * dt;
+                if (currentSpeedKmh > targetSpeedKmh) currentSpeedKmh = targetSpeedKmh;
+            } else if (currentSpeedKmh > targetSpeedKmh) {
+                currentSpeedKmh -= BRAKING * dt;
+                if (currentSpeedKmh < targetSpeedKmh) currentSpeedKmh = targetSpeedKmh;
+                if (currentSpeedKmh < 0) currentSpeedKmh = 0;
+            }
+
+            // Simulation de micro-variations si on roule
+            let displayedSpeed = currentSpeedKmh;
+            if (currentSpeedKmh > 5 && targetSpeedKmh === requiredSpeedForGreenWave(nextLight)) {
+                 displayedSpeed += Math.sin(timestamp / 400) * 1.5;
+            }
+            displayedSpeed = Math.max(0, displayedSpeed);
+
+            // Mise à jour de l'UI
+            elCurrentSpeed.innerHTML = `${Math.round(displayedSpeed)}<span>km/h</span>`;
+            if (targetSpeedKmh > 0 && targetSpeedKmh < MAX_SPEED_KMH && nextLight) {
+                elTargetSpeed.innerHTML = `${Math.round(targetSpeedKmh)}<span>km/h</span>`;
+            } else {
+                elTargetSpeed.innerHTML = `--<span>km/h</span>`;
+            }
+            elInstruction.innerHTML = instructionText;
+            elInstruction.style.borderLeftColor = instructionColor;
+            
+            if (targetSpeedKmh > 0 && instructionColor === "#00ff88") {
+                elTargetSpeed.style.color = "#00ff88";
+            } else {
+                elTargetSpeed.style.color = "rgba(255,255,255,0.5)";
+            }
+
+            // 3. Déplacement spatial
+            const currentSpeedKms = currentSpeedKmh / 3600; // km par seconde
             carDistanceTraveled += currentSpeedKms * dt;
+            
             const routeLength = turf.length(routeGeoJSON, { units: 'kilometers' });
 
             if (carDistanceTraveled >= routeLength) {
-                // Arrivé !
                 isSimulating = false;
                 elInstruction.innerHTML = "Vous êtes arrivé à destination !";
                 elInstruction.style.borderLeftColor = "#00bfff";
@@ -437,27 +546,35 @@
                 return;
             }
 
-            // Calculer la nouvelle position
             const carPoint = turf.along(routeGeoJSON, carDistanceTraveled, { units: 'kilometers' });
             map.getSource('car').setData(carPoint);
 
-            // Suivre la voiture avec la caméra
+            // Caméra fluide (Mapbox jumpTo est plus performant à 60 FPS)
             const bearing = calculateBearing(routeGeoJSON, carDistanceTraveled);
-            map.easeTo({
+            map.jumpTo({
                 center: carPoint.geometry.coordinates,
                 bearing: bearing,
                 pitch: 60,
-                duration: 0, // 0 pour un suivi fluide dans requestAnimationFrame
                 zoom: 16
             });
 
-            // Mettre à jour la couleur des feux
+            // Mettre à jour les feux (rouge/vert)
             updateTrafficLightsSource();
 
-            // Algorithme GreenWave : Analyser le prochain feu
-            updateGreenWaveHUD(currentSpeedKmh);
-
             animationFrameId = requestAnimationFrame(animateCar);
+        }
+
+        function requiredSpeedForGreenWave(light) {
+             if(!light) return -1;
+             const distKm = light.distanceFromStart - carDistanceTraveled;
+             const now = Date.now() / 1000;
+             const secondInCycle = (now + light.offset) % light.cycleDuration;
+             const isRed = secondInCycle < light.redDuration;
+             if(isRed) {
+                 const secondsUntilGreen = light.redDuration - secondInCycle;
+                 return (distKm / (secondsUntilGreen / 3600));
+             }
+             return -1;
         }
 
         // Calcule le cap (orientation) de la voiture pour tourner la carte
@@ -467,80 +584,7 @@
             return turf.bearing(pt1, pt2);
         }
 
-        // Cœur de l'application : Le calcul de la vitesse GreenWave
-        function updateGreenWaveHUD(currentSpeed) {
-            // Afficher la vitesse actuelle
-            elCurrentSpeed.innerHTML = `${Math.round(currentSpeed)}<span>km/h</span>`;
-
-            // Trouver le prochain feu
-            const nextLight = trafficLights.find(l => l.distanceFromStart > carDistanceTraveled);
-
-            if (!nextLight) {
-                elTargetSpeed.innerHTML = `--<span>km/h</span>`;
-                elInstruction.innerHTML = "Chemin libre, maintenez l'allure.";
-                elInstruction.style.borderLeftColor = "#ffffff";
-                elNextLightDist.innerHTML = `Prochain feu : Aucun`;
-                elNextLightTimer.innerHTML = ``;
-                return;
-            }
-
-            // Calculs de base
-            const distKm = nextLight.distanceFromStart - carDistanceTraveled;
-            const distMeters = Math.round(distKm * 1000);
-            
-            const now = Date.now() / 1000;
-            const secondInCycle = (now + nextLight.offset) % nextLight.cycleDuration;
-            const isRed = secondInCycle < nextLight.redDuration;
-            
-            elNextLightDist.innerHTML = `Prochain feu : ${distMeters} m`;
-
-            if (!isRed) {
-                // Le feu est VERT
-                const secondsUntilRed = nextLight.cycleDuration - secondInCycle;
-                elNextLightTimer.innerHTML = `Vert : ${Math.round(secondsUntilRed)} s`;
-                
-                // Temps pour arriver à la vitesse actuelle
-                const timeToReach = (distKm / currentSpeed) * 3600; 
-                
-                if (timeToReach <= secondsUntilRed) {
-                    elTargetSpeed.innerHTML = `${Math.round(currentSpeed)}<span>km/h</span>`;
-                    elInstruction.innerHTML = "Le feu est vert. Maintenez l'allure !";
-                    elInstruction.style.borderLeftColor = "#00ff88"; // Vert
-                    elTargetSpeed.style.color = "#00ff88";
-                } else {
-                    elTargetSpeed.innerHTML = `--<span>km/h</span>`;
-                    elInstruction.innerHTML = "Feu vert trop loin. Préparez-vous à ralentir.";
-                    elInstruction.style.borderLeftColor = "#ffaa00"; // Orange
-                    elTargetSpeed.style.color = "#ffaa00";
-                }
-            } else {
-                // Le feu est ROUGE
-                const secondsUntilGreen = nextLight.redDuration - secondInCycle;
-                elNextLightTimer.innerHTML = `Rouge : ${Math.round(secondsUntilGreen)} s`;
-                
-                // Quelle vitesse pour arriver exactement quand ça passe au vert ?
-                // V = D / T (en km/h)
-                const targetSpeedKmh = (distKm / (secondsUntilGreen / 3600));
-
-                if (targetSpeedKmh > 50) {
-                    // Limite de ville à 50
-                    elTargetSpeed.innerHTML = `50<span>km/h</span>`;
-                    elInstruction.innerHTML = "Impossible d'avoir le vert. Roulez normalement.";
-                    elInstruction.style.borderLeftColor = "#ff4040"; // Rouge
-                    elTargetSpeed.style.color = "#ff4040";
-                } else if (targetSpeedKmh < 10) {
-                    elTargetSpeed.innerHTML = `<10<span>km/h</span>`;
-                    elInstruction.innerHTML = "Arrêt imminent au prochain feu.";
-                    elInstruction.style.borderLeftColor = "#ff4040";
-                    elTargetSpeed.style.color = "#ff4040";
-                } else {
-                    elTargetSpeed.innerHTML = `${Math.round(targetSpeedKmh)}<span>km/h</span>`;
-                    elInstruction.innerHTML = `Ajustez à ${Math.round(targetSpeedKmh)} km/h pour la vague verte !`;
-                    elInstruction.style.borderLeftColor = "#00ff88";
-                    elTargetSpeed.style.color = "#00ff88";
-                }
-            }
-        }
+// Fonction updateGreenWaveHUD supprimée car intégrée directement dans animateCar
     </script>
 </body>
 </html>
