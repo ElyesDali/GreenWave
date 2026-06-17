@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GreenWave GPS Simulator</title>
+    
+    <!-- Polices Google -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Mapbox GL JS -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
+    
+    <!-- Mapbox Geocoder -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
+    
+    <!-- Turf.js (pour la simulation spatiale) -->
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+
+    <style>
+        :root {
+            --gw-green: #00ff88;
+            --gw-green-glow: rgba(0, 255, 136, 0.4);
+            --gw-dark: #121212;
+            --gw-text: #ffffff;
+            --glass-bg: rgba(18, 18, 18, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            background-color: var(--gw-dark);
+            color: var(--gw-text);
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        /* --- Customisation du Geocoder Mapbox --- */
+        .mapboxgl-ctrl-geocoder {
+            background-color: var(--glass-bg) !important;
+            backdrop-filter: blur(12px) !important;
+            border: 1px solid var(--glass-border) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+            color: white !important;
+        }
+        .mapboxgl-ctrl-geocoder--input {
+            color: white !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+        .mapboxgl-ctrl-geocoder--input::placeholder {
+            color: rgba(255, 255, 255, 0.5) !important;
+        }
+        .mapboxgl-ctrl-geocoder--icon {
+            fill: var(--gw-green) !important;
+        }
+        .suggestions {
+            background-color: #1e1e1e !important;
+            color: white !important;
+            border-radius: 8px !important;
+        }
+        .mapboxgl-ctrl-geocoder .suggestions > li > a {
+            color: white !important;
+        }
+        .mapboxgl-ctrl-geocoder .suggestions > .active > a, 
+        .mapboxgl-ctrl-geocoder .suggestions > li > a:hover {
+            background-color: #2c2c2c !important;
+            color: var(--gw-green) !important;
+        }
+
+        /* --- HUD GreenWave (Glassmorphism) --- */
+        #hud {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 400px;
+            padding: 20px;
+            border-radius: 20px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 10;
+            transition: all 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #hud.active {
+            opacity: 1;
+        }
+
+        .hud-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 10px;
+        }
+
+        .hud-title {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.6);
+        }
+
+        .hud-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gw-green);
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background-color: var(--gw-green);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--gw-green-glow);
+            animation: pulsate 1.5s infinite alternate;
+        }
+
+        @keyframes pulsate {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.2); opacity: 1; }
+        }
+
+        .speed-metrics {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .metric {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .metric-value span {
+            font-size: 16px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .target-speed {
+            color: var(--gw-green);
+            text-shadow: 0 0 15px var(--gw-green-glow);
+        }
+
+        .instruction-banner {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            border-left: 4px solid var(--gw-green);
+        }
+
+        /* Feux d'information */
+        .light-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <div id="hud">
+        <div class="hud-header">
+            <div class="hud-title">GreenWave Assistant</div>
+            <div class="hud-status">
+                <div class="pulse"></div> Actif
+            </div>
+        </div>
+
+        <div class="speed-metrics">
+            <div class="metric">
+                <div class="metric-label">VITESSE ACTUELLE</div>
+                <div class="metric-value" id="current-speed">35<span>km/h</span></div>
+            </div>
+            <div class="metric" style="text-align: right;">
+                <div class="metric-label">CIBLE POUR LE VERT</div>
+                <div class="metric-value target-speed" id="target-speed">--<span>km/h</span></div>
+            </div>
+        </div>
+
+        <div class="instruction-banner" id="instruction-text">
+            Calcul en cours...
+        </div>
+
+        <div class="light-info">
+            <span id="next-light-dist">Prochain feu : -- m</span>
+            <span id="next-light-timer">Rouge : -- s</span>
+        </div>
+    </div>
+
+    <script>
+        // === 1. CONFIGURATION ===
+        const MAPBOX_TOKEN = "pk.eyJ1IjoibWlzdGVyZTEwIiwiYSI6ImNtcDh5MzFxajBjdzQyc3F1ejdnN2J6ZmwifQ.kL9x8VkcfnAb3fwfEW20rg";
+        mapboxgl.accessToken = MAPBOX_TOKEN;
+
+        // Position de départ arbitraire (Paris, Arc de Triomphe)
+        const START_COORDS = [2.2950, 48.8738];
+
+        // === 2. INITIALISATION DE LA CARTE ===
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/dark-v11',
+            center: START_COORDS,
+            zoom: 14,
+            pitch: 60, // Angle 3D
+            bearing: -15
+        });
+
+        // Ajout de la barre de recherche (Geocoder)
+        const geocoder = new MapboxGeocoder({
+            accessToken: mapboxgl.accessToken,
+            mapboxgl: mapboxgl,
+            marker: false, // On gère le marqueur nous-mêmes
+            placeholder: 'Rechercher une destination...',
+            countries: 'fr',
+            bbox: [2.2, 48.8, 2.4, 48.9] // Restreint un peu autour de Paris pour l'exemple
+        });
+        map.addControl(geocoder, 'top-left');
+
+        // === 3. VARIABLES DE SIMULATION ===
+        let routeGeoJSON = null;
+        let trafficLights = []; // Liste des feux { coords, cycleRouge, offset }
+        let animationFrameId = null;
+        let isSimulating = false;
+        
+        // État de la voiture
+        let carDistanceTraveled = 0; // en kilomètres
+        const BASE_SPEED_KMH = 35; // Vitesse physique du véhicule simulé
+
+        // Éléments DOM du HUD
+        const elHud = document.getElementById('hud');
+        const elCurrentSpeed = document.getElementById('current-speed');
+        const elTargetSpeed = document.getElementById('target-speed');
+        const elInstruction = document.getElementById('instruction-text');
+        const elNextLightDist = document.getElementById('next-light-dist');
+        const elNextLightTimer = document.getElementById('next-light-timer');
+
+        // === 4. LOGIQUE DE ROUTAGE ET GÉNÉRATION DE DONNÉES ===
+
+        map.on('load', () => {
+            // Sources et Calques vides pour la route
+            map.addSource('route', { type: 'geojson', data: turf.featureCollection([]) });
+            map.addLayer({
+                id: 'route-layer',
+                type: 'line',
+                source: 'route',
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: {
+                    'line-color': '#00ff88',
+                    'line-width': 6,
+                    'line-opacity': 0.6
+                }
+            });
+
+            // Sources et Calques pour les feux
+            map.addSource('traffic-lights', { type: 'geojson', data: turf.featureCollection([]) });
+            map.addLayer({
+                id: 'traffic-lights-layer',
+                type: 'circle',
+                source: 'traffic-lights',
+                paint: {
+                    'circle-radius': 8,
+                    'circle-color': ['get', 'color'], // Défini dynamiquement
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': '#ffffff'
+                }
+            });
+
+            // Calque pour la voiture (point bleu lumineux)
+            map.addSource('car', { type: 'geojson', data: turf.featureCollection([]) });
+            map.addLayer({
+                id: 'car-layer',
+                type: 'circle',
+                source: 'car',
+                paint: {
+                    'circle-radius': 10,
+                    'circle-color': '#00bfff',
+                    'circle-stroke-width': 3,
+                    'circle-stroke-color': '#ffffff',
+                    'circle-pitch-alignment': 'map'
+                }
+            });
+        });
+
+        // Lors de la sélection d'une adresse
+        geocoder.on('result', async (event) => {
+            const destCoords = event.result.geometry.coordinates;
+            await fetchRoute(START_COORDS, destCoords);
+        });
+
+        async function fetchRoute(start, end) {
+            const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&access_token=${MAPBOX_TOKEN}`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.routes && data.routes.length > 0) {
+                    routeGeoJSON = data.routes[0].geometry;
+                    
+                    // Dessiner la route
+                    map.getSource('route').setData(routeGeoJSON);
+                    
+                    // Générer les faux feux tous les ~500m
+                    generateTrafficLights(routeGeoJSON);
+                    
+                    // Ajuster la caméra pour voir toute la route initialement
+                    const bbox = turf.bbox(routeGeoJSON);
+                    map.fitBounds(bbox, { padding: 50 });
+
+                    // Lancer la simulation !
+                    startSimulation();
+                }
+            } catch (err) {
+                console.error("Erreur de calcul d'itinéraire", err);
+            }
+        }
+
+        // Génère des feux tricolores le long de la ligne
+        function generateTrafficLights(lineString) {
+            trafficLights = [];
+            const lineDistance = turf.length(lineString, { units: 'kilometers' });
+            
+            // Un feu tous les 0.5 km
+            for (let d = 0.5; d < lineDistance; d += 0.5) {
+                const pt = turf.along(lineString, d, { units: 'kilometers' });
+                trafficLights.push({
+                    coords: pt.geometry.coordinates,
+                    distanceFromStart: d,
+                    // Paramètres du feu
+                    cycleDuration: 60, // Total: 60 secondes
+                    redDuration: 40,   // Rouge: 40s (donc Vert: 20s)
+                    offset: Math.floor(Math.random() * 60) // Désynchronisation aléatoire
+                });
+            }
+            updateTrafficLightsSource();
+        }
+
+        // Met à jour la source GeoJSON des feux en fonction de leur état actuel
+        function updateTrafficLightsSource() {
+            if (trafficLights.length === 0) return;
+            
+            const now = Date.now() / 1000; // secondes
+            const features = trafficLights.map(light => {
+                const secondInCycle = (now + light.offset) % light.cycleDuration;
+                const isRed = secondInCycle < light.redDuration;
+                
+                return turf.point(light.coords, {
+                    color: isRed ? '#ff4040' : '#00ff88', // Rouge vif ou Vert vif
+                    isRed: isRed
+                });
+            });
+
+            map.getSource('traffic-lights').setData(turf.featureCollection(features));
+        }
+
+        // === 5. SIMULATION & ALGORITHME ===
+
+        let lastTime = 0;
+
+        function startSimulation() {
+            if (isSimulating) cancelAnimationFrame(animationFrameId);
+            
+            carDistanceTraveled = 0;
+            isSimulating = true;
+            elHud.classList.add('active');
+            lastTime = performance.now();
+            
+            animateCar(lastTime);
+        }
+
+        function animateCar(timestamp) {
+            if (!isSimulating) return;
+            
+            const dt = (timestamp - lastTime) / 1000; // Delta time en secondes
+            lastTime = timestamp;
+
+            // Fluctuation légère de la vitesse physique pour le réalisme (± 2 km/h)
+            const speedFluctuation = Math.sin(timestamp / 500) * 2;
+            const currentSpeedKmh = BASE_SPEED_KMH + speedFluctuation;
+            const currentSpeedKms = currentSpeedKmh / 3600; // km par seconde
+
+            // Avancer la voiture
+            carDistanceTraveled += currentSpeedKms * dt;
+            const routeLength = turf.length(routeGeoJSON, { units: 'kilometers' });
+
+            if (carDistanceTraveled >= routeLength) {
+                // Arrivé !
+                isSimulating = false;
+                elInstruction.innerHTML = "Vous êtes arrivé à destination !";
+                elInstruction.style.borderLeftColor = "#00bfff";
+                map.getSource('car').setData(turf.featureCollection([]));
+                return;
+            }
+
+            // Calculer la nouvelle position
+            const carPoint = turf.along(routeGeoJSON, carDistanceTraveled, { units: 'kilometers' });
+            map.getSource('car').setData(carPoint);
+
+            // Suivre la voiture avec la caméra
+            const bearing = calculateBearing(routeGeoJSON, carDistanceTraveled);
+            map.easeTo({
+                center: carPoint.geometry.coordinates,
+                bearing: bearing,
+                pitch: 60,
+                duration: 0, // 0 pour un suivi fluide dans requestAnimationFrame
+                zoom: 16
+            });
+
+            // Mettre à jour la couleur des feux
+            updateTrafficLightsSource();
+
+            // Algorithme GreenWave : Analyser le prochain feu
+            updateGreenWaveHUD(currentSpeedKmh);
+
+            animationFrameId = requestAnimationFrame(animateCar);
+        }
+
+        // Calcule le cap (orientation) de la voiture pour tourner la carte
+        function calculateBearing(line, dist) {
+            const pt1 = turf.along(line, dist, { units: 'kilometers' });
+            const pt2 = turf.along(line, Math.min(dist + 0.01, turf.length(line)), { units: 'kilometers' });
+            return turf.bearing(pt1, pt2);
+        }
+
+        // Cœur de l'application : Le calcul de la vitesse GreenWave
+        function updateGreenWaveHUD(currentSpeed) {
+            // Afficher la vitesse actuelle
+            elCurrentSpeed.innerHTML = `${Math.round(currentSpeed)}<span>km/h</span>`;
+
+            // Trouver le prochain feu
+            const nextLight = trafficLights.find(l => l.distanceFromStart > carDistanceTraveled);
+
+            if (!nextLight) {
+                elTargetSpeed.innerHTML = `--<span>km/h</span>`;
+                elInstruction.innerHTML = "Chemin libre, maintenez l'allure.";
+                elInstruction.style.borderLeftColor = "#ffffff";
+                elNextLightDist.innerHTML = `Prochain feu : Aucun`;
+                elNextLightTimer.innerHTML = ``;
+                return;
+            }
+
+            // Calculs de base
+            const distKm = nextLight.distanceFromStart - carDistanceTraveled;
+            const distMeters = Math.round(distKm * 1000);
+            
+            const now = Date.now() / 1000;
+            const secondInCycle = (now + nextLight.offset) % nextLight.cycleDuration;
+            const isRed = secondInCycle < nextLight.redDuration;
+            
+            elNextLightDist.innerHTML = `Prochain feu : ${distMeters} m`;
+
+            if (!isRed) {
+                // Le feu est VERT
+                const secondsUntilRed = nextLight.cycleDuration - secondInCycle;
+                elNextLightTimer.innerHTML = `Vert : ${Math.round(secondsUntilRed)} s`;
+                
+                // Temps pour arriver à la vitesse actuelle
+                const timeToReach = (distKm / currentSpeed) * 3600; 
+                
+                if (timeToReach <= secondsUntilRed) {
+                    elTargetSpeed.innerHTML = `${Math.round(currentSpeed)}<span>km/h</span>`;
+                    elInstruction.innerHTML = "Le feu est vert. Maintenez l'allure !";
+                    elInstruction.style.borderLeftColor = "#00ff88"; // Vert
+                    elTargetSpeed.style.color = "#00ff88";
+                } else {
+                    elTargetSpeed.innerHTML = `--<span>km/h</span>`;
+                    elInstruction.innerHTML = "Feu vert trop loin. Préparez-vous à ralentir.";
+                    elInstruction.style.borderLeftColor = "#ffaa00"; // Orange
+                    elTargetSpeed.style.color = "#ffaa00";
+                }
+            } else {
+                // Le feu est ROUGE
+                const secondsUntilGreen = nextLight.redDuration - secondInCycle;
+                elNextLightTimer.innerHTML = `Rouge : ${Math.round(secondsUntilGreen)} s`;
+                
+                // Quelle vitesse pour arriver exactement quand ça passe au vert ?
+                // V = D / T (en km/h)
+                const targetSpeedKmh = (distKm / (secondsUntilGreen / 3600));
+
+                if (targetSpeedKmh > 50) {
+                    // Limite de ville à 50
+                    elTargetSpeed.innerHTML = `50<span>km/h</span>`;
+                    elInstruction.innerHTML = "Impossible d'avoir le vert. Roulez normalement.";
+                    elInstruction.style.borderLeftColor = "#ff4040"; // Rouge
+                    elTargetSpeed.style.color = "#ff4040";
+                } else if (targetSpeedKmh < 10) {
+                    elTargetSpeed.innerHTML = `<10<span>km/h</span>`;
+                    elInstruction.innerHTML = "Arrêt imminent au prochain feu.";
+                    elInstruction.style.borderLeftColor = "#ff4040";
+                    elTargetSpeed.style.color = "#ff4040";
+                } else {
+                    elTargetSpeed.innerHTML = `${Math.round(targetSpeedKmh)}<span>km/h</span>`;
+                    elInstruction.innerHTML = `Ajustez à ${Math.round(targetSpeedKmh)} km/h pour la vague verte !`;
+                    elInstruction.style.borderLeftColor = "#00ff88";
+                    elTargetSpeed.style.color = "#00ff88";
+                }
+            }
+        }
+    </script>
+</body>
+</html>
