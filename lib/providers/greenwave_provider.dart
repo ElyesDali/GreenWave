@@ -16,7 +16,7 @@ final trafficLightServiceProvider = Provider<TrafficLightService>((ref) {
 final navigationServiceProvider = Provider<NavigationService>((ref) {
   // Token public Mapbox - même que dans main.dart
   return NavigationService(
-    'pk.eyJ1IjoiY3JpcHRvcmUiLCJhIjoiY21tdDFnNGM1MW5lbTJxc2Q4bzl2OHVtbCJ9.wrN_jj90xlFf9JkrBalinQ',
+    'pk.eyJ1IjoibWlzdGVyZTEwIiwiYSI6ImNtcDh5MzFxajBjdzQyc3F1ejdnN2J6ZmwifQ.kL9x8VkcfnAb3fwfEW20rg',
   );
 });
 
